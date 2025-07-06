@@ -2,7 +2,7 @@
   "name": "@aqul/akinator-api",
   "author": "aqulzz",
   "description": "An Simple API for Akinator",
-  "version": "1.0.1",
+  "version": "3.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
@@ -24,8 +24,8 @@
     "akinator api"
   ],
   "dependencies": {
-    "axios": "^1.6.8",
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0-rc.12",
+    "undici": "^7.11.0"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
