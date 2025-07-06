@@ -1,17 +1,17 @@
-import { AxiosRequestConfig } from "axios"
-
 import { region } from "../constants/Config"
 
 export interface AkinatorConstructor {
   region?: region
   childMode?: boolean
-  baseUrlServerAPI: string
+  config?: any
 }
 
 export interface ResponseSetupAki {
-  id: string
+  session: string
+  signature: string
   question: string
-  baseUrlServerAPI: string
+  baseUrl: string
+  sid: number
 }
 
 export enum AkinatorAnswer {

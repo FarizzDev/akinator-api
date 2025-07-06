@@ -1,74 +1,97 @@
-import axios, { AxiosRequestConfig } from "axios"
-
 import { region, regions } from "./constants/Config"
-import { request, setupAki } from "./functions/Request"
+import { requestAki as request, setupAki } from "./functions/Request"
 import { AkinatorAnswer, AkinatorAPIAnswerResponse, AkinatorAPICancelAnswerResponse, AkinatorConstructor } from "./types/Aki"
 
 export class Akinator {
-  step: number
+  step: number = 0
   region: region
-  progress: number
-  question: string
-  isWin: boolean
-  sugestion_name: string
-  sugestion_desc: string
-  sugestion_photo: string
+  progress: number = 0.0
+  question: string = ""
+  isWin: boolean = false
+  sugestion_name: string = ""
+  sugestion_desc: string = ""
+  sugestion_photo: string = ""
 
-  private id: string
-  private baseUrlServerAPI: string
-  private session: string
-  private signature: string
-  private baseUrl: string
-  private sid: number
+  private session: string = ""
+  private signature: string = ""
+  private baseUrl: string = ""
+  private sid: number = 0
   private childMode: boolean
-  private step_last: number | undefined
+  private step_last?: number
+  private config: any = {}
 
-  private config: AxiosRequestConfig = {}
+  constructor({ region = "en", childMode = false, config = {} }: AkinatorConstructor) {
+    if (!regions.includes(region)) {
+      throw new Error("Please insert a correct region!")
+    }
 
-  constructor({ region = "en", childMode, baseUrlServerAPI }: AkinatorConstructor) {
-    if (!regions.includes(region)) throw new Error("Please insert a correct region!")
-
-    this.step = 0
     this.region = region
     this.childMode = childMode
-    this.progress = 0.0
-    this.baseUrlServerAPI = baseUrlServerAPI
+    this.config = config
   }
 
-  async start() {
-    const { id, question } = await setupAki(this.region, this.childMode, this.baseUrlServerAPI)
-    if (!id || !question) throw new Error("Failed to get id session")
+  async start(): Promise<void> {
+    const { session, signature, question, baseUrl, sid } = await setupAki(this.region, this.childMode, this.config)
 
-    this.id = id
+    if (!session || !signature || !question) {
+      throw new Error("Failed to get session and signature")
+    }
+
+    this.session = session
+    this.signature = signature
+    this.baseUrl = baseUrl
+    this.sid = sid
     this.question = question
   }
 
-  async answer(answ: AkinatorAnswer) {
-    const {
-      status,
-      data: { data: result }
-    } = await axios.get<{ data: AkinatorAPIAnswerResponse }>(this.baseUrlServerAPI + `/answer?id=${this.id}&answer=${answ}`)
-    if (status != 200 || result.completion !== "OK") throw new Error("Failed making request, status : " + status)
-    if (result.id_proposition) {
-      this.sugestion_name = result.name_proposition
-      this.sugestion_desc = result.description_proposition
-      this.sugestion_photo = result.photo
+  async answer(answ: AkinatorAnswer): Promise<void> {
+    const response = await request<AkinatorAPIAnswerResponse>(
+      `${this.baseUrl}/answer`,
+      {
+        step: this.step,
+        progression: this.progress,
+        sid: this.sid,
+        cm: this.childMode,
+        answer: answ,
+        step_last_proposition: this.step_last ?? "",
+        session: this.session,
+        signature: this.signature
+      },
+      this.config
+    )
+
+    if (response.completion !== "OK") {
+      throw new Error("Failed making request, completion: " + response.completion)
+    }
+
+    if (response.id_proposition) {
+      this.sugestion_name = response.name_proposition
+      this.sugestion_desc = response.description_proposition
+      this.sugestion_photo = response.photo
       this.isWin = true
     } else {
-      this.step = parseInt(result.step)
-      this.progress = parseFloat(result.progression)
-      this.question = result.question
+      this.step = parseInt(response.step)
+      this.progress = parseFloat(response.progression)
+      this.question = response.question
     }
   }
 
-  async cancelAnswer() {
-    const {
-      status,
-      data: { data: result }
-    } = await axios.get<{ data: AkinatorAPICancelAnswerResponse }>(this.baseUrlServerAPI + `/cancel-answer?id=${this.id}`)
-    if (status != 200) throw new Error("Failed making request, status : " + status)
-    this.step = parseInt(result.step)
-    this.progress = parseFloat(result.progression)
-    this.question = result.question
+  async cancelAnswer(): Promise<void> {
+    const response = await request<AkinatorAPICancelAnswerResponse>(
+      `${this.baseUrl}/cancel_answer`,
+      {
+        step: this.step,
+        progression: this.progress,
+        sid: this.sid,
+        cm: this.childMode,
+        session: this.session,
+        signature: this.signature
+      },
+      this.config
+    )
+
+    this.step = parseInt(response.step)
+    this.progress = parseFloat(response.progression)
+    this.question = response.question
   }
 }

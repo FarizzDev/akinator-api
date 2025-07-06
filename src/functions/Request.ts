@@ -1,36 +1,75 @@
-import axios, { AxiosRequestConfig } from "axios"
 import { load } from "cheerio"
+import { request } from "undici"
 
 import { region, themes } from "../constants/Config"
-import { AkinatorAPIAnswerResponse, ResponseSetupAki } from "../types/Aki"
+import { ResponseSetupAki } from "../types/Aki"
 
-const headers = {
-  "Content-Type": "application/x-www-form-urlencoded",
-  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-  "X-Requested-With": "XMLHttpRequest"
+const defaultHeaders = {
+  "content-type": "application/x-www-form-urlencoded",
+  "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  "x-requested-with": "XMLHttpRequest"
 }
 
-const axiosConfig: AxiosRequestConfig = {
-  validateStatus: () => true
+const defaultConfig = {
+  throwOnError: false,
+  headersTimeout: 30000,
+  bodyTimeout: 30000
 }
 
-export const setupAki = async (region: region, childMode: boolean, baseUrlServerAPI: string): Promise<ResponseSetupAki> => {
+export const setupAki = async (region: region, childMode: boolean, config: any = {}): Promise<ResponseSetupAki> => {
   try {
-    const {
-      data: { data }
-    } = await axios.get(`${baseUrlServerAPI}/start?region=${region}&child_mode=${childMode}`)
-    return data
+    const [lang, theme] = region.split("_")
+    const baseUrl = `https://${lang}.akinator.com`
+    const sid = themes[theme] ?? 1
+
+    const body = new URLSearchParams(
+      Object.entries({
+        cm: childMode === true,
+        sid
+      })
+    ).toString()
+
+    const { body: responseBody } = await request(`${baseUrl}/game`, {
+      method: "POST",
+      headers: {
+        ...defaultHeaders,
+        ...config.headers
+      },
+      body,
+      ...defaultConfig,
+      ...config
+    })
+
+    const data = await responseBody.text()
+    const $ = load(data)
+    const session = $("#askSoundlike > #session").attr("value")
+    const signature = $("#askSoundlike > #signature").attr("value")
+    const question = $("#question-label").text()
+
+    return { session, signature, question, baseUrl, sid }
   } catch (e) {
     console.log(e)
+    throw e
   }
 }
 
-/**
- *
- * @deprecated
- */
-export const request = async <data>(url: string, body: any, config: AxiosRequestConfig) =>
-  axios.post<number, data>(url, body, {
-    headers: { ...headers, ...config.headers },
-    ...axiosConfig
+export const requestAki = async <T>(url: string, body: any, config: any = {}): Promise<T> => {
+  const { body: responseBody } = await request(url, {
+    method: "POST",
+    headers: {
+      ...defaultHeaders,
+      ...config.headers
+    },
+    body: new URLSearchParams(Object.entries(body)).toString(),
+    ...defaultConfig,
+    ...config
   })
+
+  const data = await responseBody.text()
+
+  try {
+    return JSON.parse(data) as T
+  } catch {
+    return data as unknown as T
+  }
+}
