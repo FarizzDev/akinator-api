@@ -10,10 +10,17 @@ const defaultHeaders = {
   "x-requested-with": "XMLHttpRequest"
 }
 
-const defaultConfig = {
-  throwOnError: false,
-  headersTimeout: 30000,
-  bodyTimeout: 30000
+function getRequestConfig(customConfig?: any) {
+  const majorVersion = Number(process.version.slice(1).split(".")[0])
+  const config: any = {
+    headersTimeout: 30000,
+    bodyTimeout: 30000,
+    ...customConfig
+  }
+  if (majorVersion < 20) {
+    config.throwOnError = false
+  }
+  return config
 }
 
 export const setupAki = async (region: region, childMode: boolean, config: any = {}): Promise<ResponseSetupAki> => {
@@ -36,8 +43,7 @@ export const setupAki = async (region: region, childMode: boolean, config: any =
         ...config.headers
       },
       body,
-      ...defaultConfig,
-      ...config
+      ...getRequestConfig(config)
     })
 
     const data = await responseBody.text()
@@ -61,8 +67,7 @@ export const requestAki = async <T>(url: string, body: any, config: any = {}): P
       ...config.headers
     },
     body: new URLSearchParams(Object.entries(body)).toString(),
-    ...defaultConfig,
-    ...config
+    ...getRequestConfig(config)
   })
 
   const data = await responseBody.text()
